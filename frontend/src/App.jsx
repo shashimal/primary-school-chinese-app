@@ -512,19 +512,19 @@ export default function App() {
 
                   <div className="flex gap-1 bg-white/60 p-1.5 rounded-[20px] border border-slate-100 overflow-x-auto">
                     {[
-                      { id: 'grid', label: 'Grid', icon: 'Menu' },
-                      { id: 'flashcards', label: 'Cards', icon: 'BookOpen' },
-                      { id: 'writing', label: 'Write', icon: 'PenTool' },
-                      { id: 'reading', label: 'Read', icon: 'Activity' },
-                      { id: 'quiz', label: 'Quiz', icon: 'Trophy' },
-                    ].map(tab => (
+                      { id: 'grid',       label: 'Grid',  icon: 'Menu',     active: 'bg-sky-500     text-white shadow-lg shadow-sky-500/25' },
+                      { id: 'flashcards', label: 'Cards', icon: 'BookOpen', active: 'bg-violet-500  text-white shadow-lg shadow-violet-500/25' },
+                      { id: 'writing',    label: 'Write', icon: 'PenTool',  active: 'bg-amber-500   text-white shadow-lg shadow-amber-500/25' },
+                      { id: 'reading',    label: 'Read',  icon: 'Activity', active: 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' },
+                      { id: 'quiz',       label: 'Quiz',  icon: 'Trophy',   active: 'bg-yellow-400  text-slate-900 shadow-lg shadow-yellow-400/25' },
+                    ].map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setCurrentTab(tab.id)}
                         className={`flex-1 py-3 px-4 rounded-[14px] font-black text-xs flex items-center justify-center gap-2 transition-all whitespace-nowrap active:scale-95 ${
                           currentTab === tab.id
-                            ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20'
-                            : 'text-slate-500 hover:text-teal-600 hover:bg-white/50'
+                            ? tab.active
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
                         }`}
                       >
                         <Icon name={tab.icon} size={14} /> {tab.label}
