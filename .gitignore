@@ -3,3 +3,7 @@
 /backend/.idea/.gitignore
 /backend/.idea/modules.xml
 /backend/.idea/inspectionProfiles/profiles_settings.xml
+
+# DB backups — keep folder tracked, ignore dump files and log
+/dbbackup/*.dump
+/dbbackup/backup.log
