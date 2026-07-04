@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  touch-action: none;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.tianzige {
+  background-image: 
+    linear-gradient(to right, #fee2e2 1px, transparent 1px),
+    linear-gradient(to bottom, #fee2e2 1px, transparent 1px);
+  background-size: 100% 100%;
+  border: 2px solid #ef4444;
+  position: relative;
+}
+
+.tianzige::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed #fecaca;
+}
+
+.tianzige::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed #fecaca;
+}
