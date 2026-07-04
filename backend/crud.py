@@ -1,93 +1,104 @@
+from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import models
 import schemas
 
-def get_chapters(db: Session):
-    # Fetch all chapters, order by ID
-    chapters = db.query(models.Chapter).order_by(models.Chapter.id).all()
-    
-    # Fetch all mastered characters
+def get_chapters(db: Session, grade: Optional[int] = None):
+    query = db.query(models.Chapter).order_by(models.Chapter.id)
+    if grade is not None:
+        query = query.filter(models.Chapter.grade == grade)
+    chapters = query.all()
+
     mastered_chars = {
         m.char for m in db.query(models.Mastery).filter(models.Mastery.is_known == True).all()
     }
-    
+
     response_list = []
     for ch in chapters:
-        # Formulate vocabulary list
         vocab_list = [
-            schemas.VocabularyBase(
-                char=v.char,
-                pinyin=v.pinyin,
-                meaning=v.meaning,
-                emoji=v.emoji
-            ) for v in ch.vocab
+            schemas.VocabularyBase(char=v.char, pinyin=v.pinyin, meaning=v.meaning, emoji=v.emoji)
+            for v in ch.vocab
         ]
-        
-        # Calculate indices of mastered words
-        known_indices = []
-        for idx, item in enumerate(ch.vocab):
-            if item.char in mastered_chars:
-                known_indices.append(idx)
-        
-        # Formulate reading text, ordered by sequence
+
+        known_indices = [idx for idx, v in enumerate(ch.vocab) if v.char in mastered_chars]
+
         sorted_sentences = sorted(ch.reading_sentences, key=lambda s: s.sequence)
         reading_text = [
-            schemas.ReadingSentenceBase(
-                text=s.text,
-                audio=s.audio
-            ) for s in sorted_sentences
+            schemas.ReadingSentenceBase(text=s.text, audio=s.audio)
+            for s in sorted_sentences
         ]
-        
-        response_list.append(
-            schemas.ChapterResponse(
-                id=ch.id,
-                title=ch.title,
-                reading_title=ch.reading_title,
-                vocab=vocab_list,
-                readingText=reading_text,
-                knownIndices=known_indices
-            )
-        )
-        
+
+        response_list.append(schemas.ChapterResponse(
+            id=ch.id,
+            title=ch.title,
+            grade=ch.grade,
+            reading_title=ch.reading_title,
+            vocab=vocab_list,
+            readingText=reading_text,
+            knownIndices=known_indices
+        ))
+
     return response_list
 
+def get_grade_summary(db: Session):
+    mastered_chars = {
+        m.char for m in db.query(models.Mastery).filter(models.Mastery.is_known == True).all()
+    }
+
+    summaries = []
+    for grade in range(1, 7):
+        chapters = db.query(models.Chapter).filter(models.Chapter.grade == grade).all()
+        total_vocab = sum(len(ch.vocab) for ch in chapters)
+        mastered_vocab = sum(
+            1 for ch in chapters for v in ch.vocab if v.char in mastered_chars
+        )
+        summaries.append(schemas.GradeSummary(
+            grade=grade,
+            chapter_count=len(chapters),
+            total_vocab=total_vocab,
+            mastered_vocab=mastered_vocab
+        ))
+    return summaries
+
 def upsert_chapter(db: Session, upload_data: schemas.ChapterUpload):
-    # Check if chapter exists. If so, delete it to do a clean overwrite (cascade delete vocab and reading sentences)
-    existing_chapter = db.query(models.Chapter).filter(models.Chapter.id == upload_data.id).first()
-    if existing_chapter:
-        db.delete(existing_chapter)
+    if upload_data.id is None:
+        max_id = db.query(func.max(models.Chapter.id)).scalar() or 0
+        chapter_id = max_id + 1
+    else:
+        chapter_id = upload_data.id
+
+    existing = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
+    if existing:
+        db.delete(existing)
         db.commit()
-    
-    # Create the new chapter
+
     db_chapter = models.Chapter(
-        id=upload_data.id,
+        id=chapter_id,
         title=upload_data.title,
-        reading_title=upload_data.readingTitle
+        reading_title=upload_data.readingTitle,
+        grade=upload_data.grade
     )
     db.add(db_chapter)
-    db.flush() # Gets database handle configured for FKs
-    
-    # Add vocabulary items
+    db.flush()
+
     for item in upload_data.vocab:
-        db_vocab = models.Vocabulary(
+        db.add(models.Vocabulary(
             chapter_id=db_chapter.id,
             char=item.char,
             pinyin=item.pinyin,
             meaning=item.meaning,
             emoji=item.emoji
-        )
-        db.add(db_vocab)
-        
-    # Add reading sentences with sequence ordering
-    for seq, text_item in enumerate(upload_data.readingText):
-        db_sentence = models.ReadingSentence(
+        ))
+
+    for seq, item in enumerate(upload_data.readingText):
+        db.add(models.ReadingSentence(
             chapter_id=db_chapter.id,
-            text=text_item.text,
-            audio=text_item.audio,
+            text=item.text,
+            audio=item.audio,
             sequence=seq
-        )
-        db.add(db_sentence)
-        
+        ))
+
     db.commit()
     return db_chapter
 
@@ -96,10 +107,7 @@ def toggle_mastery(db: Session, toggle: schemas.MasteryToggle):
     if db_mastery:
         db_mastery.is_known = toggle.is_known
     else:
-        db_mastery = models.Mastery(
-            char=toggle.char,
-            is_known=toggle.is_known
-        )
+        db_mastery = models.Mastery(char=toggle.char, is_known=toggle.is_known)
         db.add(db_mastery)
     db.commit()
     db.refresh(db_mastery)
@@ -110,22 +118,25 @@ def record_mistake(db: Session, record: schemas.MistakeRecord):
     if db_mistake:
         db_mistake.missed_count += 1
     else:
-        db_mistake = models.Mistake(
-            char=record.char,
-            missed_count=1
-        )
+        db_mistake = models.Mistake(char=record.char, missed_count=1)
         db.add(db_mistake)
     db.commit()
     db.refresh(db_mistake)
     return db_mistake
 
 def get_mistakes(db: Session):
-    mistakes = db.query(models.Mistake).all()
-    # Return as {char: count}
-    return {m.char: m.missed_count for m in mistakes}
+    return {m.char: m.missed_count for m in db.query(models.Mistake).all()}
 
 def reset_all_progress(db: Session):
     db.query(models.Mastery).delete()
     db.query(models.Mistake).delete()
     db.commit()
-    return True
+
+def clear_chapters(db: Session, grade: Optional[int] = None):
+    query = db.query(models.Chapter)
+    if grade is not None:
+        query = query.filter(models.Chapter.grade == grade)
+    chapters = query.all()
+    for ch in chapters:
+        db.delete(ch)
+    db.commit()

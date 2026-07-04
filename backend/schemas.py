@@ -32,31 +32,23 @@ class ReadingSentence(ReadingSentenceBase):
     class Config:
         from_attributes = True
 
-class ChapterBase(BaseModel):
-    id: int
-    title: str
-    reading_title: Optional[str] = None
-
-class ChapterCreate(ChapterBase):
-    pass
-
-# Response schema matching the original app client structure
 class ChapterResponse(BaseModel):
     id: int
     title: str
+    grade: int = 4
     readingTitle: Optional[str] = Field(None, alias="reading_title")
     vocab: List[VocabularyBase] = []
     readingText: List[ReadingSentenceBase] = []
-    knownIndices: List[int] = [] # List of indices in the vocab array that are mastered
+    knownIndices: List[int] = []
 
     class Config:
         from_attributes = True
         populate_by_name = True
 
-# Upload payload schema matching raw JSON import format
 class ChapterUpload(BaseModel):
-    id: int
+    id: Optional[int] = None
     title: str
+    grade: int = 4
     readingTitle: Optional[str] = None
     vocab: List[VocabularyCreate] = []
     readingText: List[ReadingSentenceCreate] = []
@@ -85,4 +77,10 @@ class MistakeResponse(BaseModel):
 class GenerateRequest(BaseModel):
     topic: str
     api_key: Optional[str] = None
+    grade: int = 4
 
+class GradeSummary(BaseModel):
+    grade: int
+    chapter_count: int
+    total_vocab: int
+    mastered_vocab: int
