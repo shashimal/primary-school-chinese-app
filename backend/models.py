@@ -8,6 +8,7 @@ class Chapter(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     reading_title = Column(String, nullable=True)
+    grade = Column(Integer, nullable=False, default=4)
 
     vocab = relationship("Vocabulary", back_populates="chapter", cascade="all, delete-orphan")
     reading_sentences = relationship("ReadingSentence", back_populates="chapter", cascade="all, delete-orphan")
