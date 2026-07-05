@@ -84,3 +84,19 @@ class GradeSummary(BaseModel):
     chapter_count: int
     total_vocab: int
     mastered_vocab: int
+
+class ReadingMistakeRecord(BaseModel):
+    char: str
+    pinyin: Optional[str] = None
+    meaning: Optional[str] = None
+    emoji: Optional[str] = None
+
+class ReadingMistakeStat(BaseModel):
+    char: str
+    pinyin: Optional[str] = None
+    meaning: Optional[str] = None
+    emoji: Optional[str] = None
+    missed_count: int
+
+    class Config:
+        from_attributes = True

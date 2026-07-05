@@ -80,6 +80,28 @@ def reset_progress(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reset progress: {str(e)}")
 
+@app.post("/api/reading-mistakes", response_model=schemas.ReadingMistakeStat)
+def record_reading_mistake(record: schemas.ReadingMistakeRecord, db: Session = Depends(get_db)):
+    try:
+        return crud.record_reading_mistake(db, record)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record reading mistake: {str(e)}")
+
+@app.get("/api/reading-mistakes", response_model=List[schemas.ReadingMistakeStat])
+def get_reading_mistakes(db: Session = Depends(get_db)):
+    try:
+        return crud.get_reading_mistakes(db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get reading mistakes: {str(e)}")
+
+@app.post("/api/reading-mistakes/reset")
+def reset_reading_mistakes(db: Session = Depends(get_db)):
+    try:
+        crud.reset_reading_mistakes(db)
+        return {"status": "success", "message": "Reading mistakes reset."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reset reading mistakes: {str(e)}")
+
 @app.post("/api/chapters/clear")
 def clear_chapters(grade: Optional[int] = Query(None), db: Session = Depends(get_db)):
     try:

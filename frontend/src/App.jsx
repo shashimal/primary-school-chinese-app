@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import GradePicker from './components/GradePicker';
+import ReadingAnalysis from './components/ReadingAnalysis';
 import StudyGrid from './components/StudyGrid';
 import Flashcards from './components/Flashcards';
 import WritingPractice from './components/WritingPractice';
@@ -49,7 +50,9 @@ export default function App() {
   const [mistakes, setMistakes] = useState({});
   const [activeView, setActiveView] = useState('study');
   const [showMistakesModal, setShowMistakesModal] = useState(false);
+  const [mistakesTab, setMistakesTab] = useState('quiz');
   const [apiError, setApiError] = useState(null);
+  const [readingMistakes, setReadingMistakes] = useState([]);
 
   const [uploadText, setUploadText] = useState('');
   const [uploadGrade, setUploadGrade] = useState(4);
@@ -68,6 +71,31 @@ export default function App() {
       const res = await fetch(`${API_BASE}/grades`);
       if (res.ok) setGradeSummaries(await res.json());
     } catch { /* non-fatal */ }
+  };
+
+  const fetchReadingMistakes = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/reading-mistakes`);
+      if (res.ok) setReadingMistakes(await res.json());
+    } catch { /* non-fatal */ }
+  };
+
+  const onReadingMistake = async ({ char, pinyin, meaning, emoji }) => {
+    try {
+      await fetch(`${API_BASE}/reading-mistakes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ char, pinyin, meaning, emoji }),
+      });
+      fetchReadingMistakes();
+    } catch { /* ignore */ }
+  };
+
+  const handleResetReadingMistakes = async () => {
+    try {
+      await fetch(`${API_BASE}/reading-mistakes/reset`, { method: 'POST' });
+      fetchReadingMistakes();
+    } catch { /* ignore */ }
   };
 
   const fetchData = async (gradeOverride, resetSelection = false) => {
@@ -91,7 +119,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => { fetchGradeSummaries(); }, []);
+  useEffect(() => { fetchGradeSummaries(); fetchReadingMistakes(); }, []);
 
   useEffect(() => {
     if (selectedGrade) {
@@ -304,12 +332,20 @@ export default function App() {
                   const vocabLen = (ch.vocab || []).length;
                   const masteredCount = (ch.knownIndices || []).length;
                   const pct = vocabLen > 0 ? Math.round((masteredCount / vocabLen) * 100) : 0;
+                  const readingMistakeChars = readingMistakes.filter(m => (ch.vocab || []).some(v => v.char === m.char)).length;
                   return (
                     <button key={ch.id} onClick={() => { setCurrentChapterId(ch.id); setCurrentTab('grid'); }}
                       className={`w-full text-left p-4 rounded-3xl border-2 transition-all flex flex-col gap-3 group ${isActive ? 'bg-white border-teal-500 shadow-xl shadow-teal-500/5' : 'bg-white/60 hover:bg-white border-transparent hover:border-slate-100 shadow-sm hover:shadow-md'}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chapter {idx + 1}</span>
-                        {pct === 100 && <Icon name="CheckCircle2" size={14} className="text-teal-600" />}
+                        <div className="flex items-center gap-1.5">
+                          {readingMistakeChars > 0 && (
+                            <span className="flex items-center gap-1 text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />{readingMistakeChars} need work
+                            </span>
+                          )}
+                          {pct === 100 && <Icon name="CheckCircle2" size={14} className="text-teal-600" />}
+                        </div>
                       </div>
                       <div>
                         <h3 className="font-black text-base text-slate-800 group-hover:text-teal-600 transition-colors leading-tight">{ch.title}</h3>
@@ -345,12 +381,16 @@ export default function App() {
                   {chapters.map((ch, idx) => {
                     const isActive = ch.id === currentChapterId;
                     const pct = (ch.vocab?.length > 0) ? Math.round(((ch.knownIndices?.length || 0) / ch.vocab.length) * 100) : 0;
+                    const stripMistakes = readingMistakes.filter(m => (ch.vocab || []).some(v => v.char === m.char)).length;
                     return (
                       <button key={ch.id} onClick={() => { setCurrentChapterId(ch.id); setCurrentTab('grid'); }}
                         className={`shrink-0 text-left px-4 py-3 rounded-2xl border-2 transition-all min-w-[130px] ${isActive ? 'bg-white border-teal-500 shadow-md' : 'bg-white/70 border-transparent shadow-sm'}`}>
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ch {idx + 1}</div>
                         <div className="text-sm font-black text-slate-800 truncate max-w-[110px] mt-0.5">{ch.title}</div>
-                        <div className={`text-[10px] font-bold mt-1 ${isActive ? 'text-teal-600' : 'text-slate-400'}`}>{pct}% done</div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className={`text-[10px] font-bold ${isActive ? 'text-teal-600' : 'text-slate-400'}`}>{pct}% done</span>
+                          {stripMistakes > 0 && <span className="text-[10px] font-black text-rose-600">🔴{stripMistakes}</span>}
+                        </div>
                       </button>
                     );
                   })}
@@ -397,7 +437,7 @@ export default function App() {
                     {currentTab === 'grid'       && <StudyGrid chapter={currentChapter} speak={speak} toggleKnown={toggleKnown} />}
                     {currentTab === 'flashcards' && <Flashcards chapter={currentChapter} speak={speak} toggleKnown={toggleKnown} />}
                     {currentTab === 'writing'    && <WritingPractice chapter={currentChapter} speak={speak} />}
-                    {currentTab === 'reading'    && <ReadingPractice chapter={currentChapter} speak={speak} />}
+                    {currentTab === 'reading'    && <ReadingPractice chapter={currentChapter} speak={speak} readingMistakes={readingMistakes} onReadingMistake={onReadingMistake} onResetReadingMistakes={handleResetReadingMistakes} />}
                     {currentTab === 'quiz'       && <Quiz chapter={currentChapter} speak={speak} onIncorrect={onIncorrect} />}
                   </div>
                 </div>
@@ -528,45 +568,80 @@ export default function App() {
       {showMistakesModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full sm:max-w-lg rounded-t-[32px] sm:rounded-[36px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh]">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div>
-                <h3 className="font-black text-base text-slate-800">Mistakes Review</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Characters missed in quizzes</p>
-              </div>
+
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <h3 className="font-black text-base text-slate-800">Practice Mistakes</h3>
               <button onClick={() => setShowMistakesModal(false)} className="p-2 hover:bg-slate-200/50 rounded-xl transition-all text-slate-400">
                 <Icon name="X" size={20} />
               </button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1">
-              {totalMistakesCount > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Object.entries(mistakes).map(([char, count]) => {
-                    let pinyin = '', meaning = '', emoji = '';
-                    for (const ch of chapters) { const item = ch.vocab.find(v => v.char === char); if (item) { pinyin = item.pinyin; meaning = item.meaning; emoji = item.emoji; break; } }
-                    return (
-                      <div key={char} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex items-center gap-3">
-                        <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-xl shadow-inner shrink-0">{emoji || '💬'}</div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-black text-base text-slate-800 leading-none">{char}</h4>
-                          {pinyin && <p className="text-[10px] font-bold text-teal-600 mt-1 uppercase">{pinyin}</p>}
-                          {meaning && <p className="text-xs text-slate-400 font-bold truncate mt-0.5">{meaning}</p>}
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5 shrink-0">
-                          <span className="text-[10px] bg-rose-50 text-rose-600 font-black px-2 py-0.5 rounded-full border border-rose-100">×{count}</span>
-                          <button onClick={() => speak(char)} className="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg transition-all"><Icon name="Volume2" size={14} /></button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Icon name="Trophy" size={48} className="mx-auto text-emerald-500 mb-4 animate-bounce" />
-                  <h4 className="font-black text-slate-800 text-lg">No Mistakes!</h4>
-                  <p className="text-slate-400 font-bold text-xs mt-1">Keep it up in the quizzes.</p>
-                </div>
-              )}
+
+            {/* Tabs */}
+            <div className="flex border-b border-slate-100 shrink-0">
+              <button onClick={() => setMistakesTab('quiz')}
+                className={`flex-1 py-3 text-xs font-black flex items-center justify-center gap-2 transition-all border-b-2 ${
+                  mistakesTab === 'quiz' ? 'border-amber-400 text-amber-700 bg-amber-50/30' : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}>
+                <Icon name="Trophy" size={13} /> Quiz
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${mistakesTab === 'quiz' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {totalMistakesCount}
+                </span>
+              </button>
+              <button onClick={() => setMistakesTab('reading')}
+                className={`flex-1 py-3 text-xs font-black flex items-center justify-center gap-2 transition-all border-b-2 ${
+                  mistakesTab === 'reading' ? 'border-rose-400 text-rose-700 bg-rose-50/30' : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}>
+                🎤 Reading
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${mistakesTab === 'reading' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {readingMistakes.length}
+                </span>
+              </button>
             </div>
+
+            {/* Quiz tab */}
+            {mistakesTab === 'quiz' && (
+              <div className="p-5 overflow-y-auto flex-1">
+                {totalMistakesCount > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {Object.entries(mistakes).map(([char, count]) => {
+                      let pinyin = '', meaning = '', emoji = '';
+                      for (const ch of chapters) { const item = ch.vocab.find(v => v.char === char); if (item) { pinyin = item.pinyin; meaning = item.meaning; emoji = item.emoji; break; } }
+                      return (
+                        <div key={char} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex items-center gap-3">
+                          <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-xl shadow-inner shrink-0">{emoji || '💬'}</div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-black text-base text-slate-800 leading-none">{char}</h4>
+                            {pinyin && <p className="text-[10px] font-bold text-teal-600 mt-1 uppercase">{pinyin}</p>}
+                            {meaning && <p className="text-xs text-slate-400 font-bold truncate mt-0.5">{meaning}</p>}
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <span className="text-[10px] bg-rose-50 text-rose-600 font-black px-2 py-0.5 rounded-full border border-rose-100">×{count}</span>
+                            <button onClick={() => speak(char)} className="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg transition-all"><Icon name="Volume2" size={14} /></button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Icon name="Trophy" size={48} className="mx-auto text-emerald-500 mb-4 animate-bounce" />
+                    <h4 className="font-black text-slate-800 text-lg">No Quiz Mistakes!</h4>
+                    <p className="text-slate-400 font-bold text-xs mt-1">Keep it up in the quizzes.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Reading tab */}
+            {mistakesTab === 'reading' && (
+              <div className="p-5 overflow-y-auto flex-1">
+                <ReadingAnalysis
+                  mistakes={readingMistakes}
+                  onReset={handleResetReadingMistakes}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

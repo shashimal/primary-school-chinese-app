@@ -130,6 +130,41 @@ def get_mistakes(db: Session):
 def reset_all_progress(db: Session):
     db.query(models.Mastery).delete()
     db.query(models.Mistake).delete()
+
+def record_reading_mistake(db: Session, record: schemas.ReadingMistakeRecord):
+    db_m = db.query(models.ReadingMistake).filter(models.ReadingMistake.char == record.char).first()
+    if db_m:
+        db_m.missed_count += 1
+        # Update vocab info if it was missing before
+        if record.pinyin and not db_m.pinyin:
+            db_m.pinyin = record.pinyin
+        if record.meaning and not db_m.meaning:
+            db_m.meaning = record.meaning
+        if record.emoji and not db_m.emoji:
+            db_m.emoji = record.emoji
+    else:
+        db_m = models.ReadingMistake(
+            char=record.char,
+            pinyin=record.pinyin,
+            meaning=record.meaning,
+            emoji=record.emoji,
+            missed_count=1,
+        )
+        db.add(db_m)
+    db.commit()
+    db.refresh(db_m)
+    return db_m
+
+def get_reading_mistakes(db: Session):
+    return (
+        db.query(models.ReadingMistake)
+        .order_by(models.ReadingMistake.missed_count.desc())
+        .all()
+    )
+
+def reset_reading_mistakes(db: Session):
+    db.query(models.ReadingMistake).delete()
+    db.commit()
     db.commit()
 
 def clear_chapters(db: Session, grade: Optional[int] = None):

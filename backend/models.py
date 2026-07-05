@@ -49,3 +49,13 @@ class Mistake(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     char = Column(String, unique=True, index=True, nullable=False)
     missed_count = Column(Integer, default=0, nullable=False)
+
+class ReadingMistake(Base):
+    __tablename__ = "reading_mistakes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    char = Column(String, unique=True, index=True, nullable=False)
+    pinyin = Column(String, nullable=True)
+    meaning = Column(String, nullable=True)
+    emoji = Column(String, nullable=True)
+    missed_count = Column(Integer, default=0, nullable=False)

@@ -45,7 +45,7 @@ const COLORS = [
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
-const ReadingPractice = ({ chapter, speak }) => {
+const ReadingPractice = ({ chapter, speak, readingMistakes = [], onReadingMistake, onResetReadingMistakes }) => {
   const readingText = chapter.readingText || [];
 
   const [listeningIdx, setListeningIdx] = useState(null);
@@ -53,8 +53,8 @@ const ReadingPractice = ({ chapter, speak }) => {
   const [errors,  setErrors]            = useState({});
 
   const recognitionRef  = useRef(null);
-  const accumulatedRef  = useRef('');   // final segments joined together
-  const interimRef      = useRef('');   // latest interim segment
+  const accumulatedRef  = useRef('');
+  const interimRef      = useRef('');
 
   const SpeechAPI    = window.SpeechRecognition || window.webkitSpeechRecognition || null;
   const micSupported = !!SpeechAPI;
@@ -97,12 +97,20 @@ const ReadingPractice = ({ chapter, speak }) => {
       }));
     };
 
-    // Called when recognition session ends (after stop() or natural timeout)
     rec.onend = () => {
       const transcript = (accumulatedRef.current + interimRef.current).trim();
       if (transcript) {
         const comparison = compareTexts(originalText, transcript);
         setResults(prev => ({ ...prev, [idx]: { transcript, comparison, isFinal: true } }));
+
+        // Record each unique missed character once
+        if (onReadingMistake) {
+          const missed = [...new Set(comparison.filter(c => c.status === 'missing').map(c => c.char))];
+          for (const char of missed) {
+            const vocabItem = (chapter.vocab || []).find(v => v.char === char);
+            onReadingMistake({ char, pinyin: vocabItem?.pinyin, meaning: vocabItem?.meaning, emoji: vocabItem?.emoji });
+          }
+        }
       }
       setListeningIdx(null);
     };
